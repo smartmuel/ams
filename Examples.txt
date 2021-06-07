@@ -1,0 +1,42 @@
+* All the examples import the library with: "from TCT import *"
+
+Sending SSH commands:
+
+Best way:
+with CM.ssh(IP="ssh_ip", user="username", password="password") as ssh:
+	ssh.command("")
+	data = ssh.command("")
+	
+Another way:
+ssh = SSH(IP="ssh_ip", USER="username", PASSWORD="password")
+ssh.command("")
+data = ssh.command("")
+ssh.Close()
+
+==========================================================
+
+
+Chrome automation:
+
+Best way:
+with CM.chrome(url="URL or IP") as driver:
+	driver.fill(elem="the_elem_of_an_element can be Xpath only", text="what_you_want_to_fill") 
+	driver.click(elem="the_elem_of_an_element can be Xpath only")
+
+Another way:
+driver = Chrome(url = "URL or IP")
+driver.fill(elem="the_elem_of_an_element can be Xpath only", text="what_you_want_to_fill") 
+driver.click(elem="the_elem_of_an_element can be Xpath only")
+driver.close()
+
+==========================================================
+
+Starting/Stopping Breaking Point test:
+
+BP.Start(AppSim=[*], Session=[**], Test_Name = "Test name")
+BP.Stop()
+
+* Which Application Simulator to use.
+** Which Session Sender to use.
+
+==========================================================
