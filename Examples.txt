@@ -1,17 +1,17 @@
-* All the examples import the library with: "from TCT import *"
+* All the examples import the library with: "from ams import *"
 
 Sending SSH commands:
 
 Best way:
-with CM.ssh(IP="ssh_ip", user="username", password="password") as ssh:
+with CM.ssh(host="ssh_ip", user="username", password="password") as ssh:
 	ssh.command("")
 	data = ssh.command("")
 	
 Another way:
-ssh = SSH(IP="ssh_ip", USER="username", PASSWORD="password")
+ssh = SSH(host="ssh_ip", USER="username", PASSWORD="password")
 ssh.command("")
 data = ssh.command("")
-ssh.Close()
+ssh.close()
 
 ==========================================================
 
@@ -31,12 +31,13 @@ driver.close()
 
 ==========================================================
 
-Starting/Stopping Breaking Point test:
+Starting Syslog Server:
 
-BP.Start(AppSim=[*], Session=[**], Test_Name = "Test name")
-BP.Stop()
-
-* Which Application Simulator to use.
-** Which Session Sender to use.
-
-==========================================================
+Best way:
+with CM.syslog(name = "file_name") as syslog:
+	your code
+	
+Another way:
+syslog = Syslog(name = "file_name")
+your code
+syslog.close()
