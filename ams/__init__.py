@@ -12,19 +12,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.keys import Keys
 
-
 cwd = os.getcwd()
-
-# context managers for changing directory
-class cd(object):
-    def __init__(self, path: str):
-        os.chdir(path)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        os.chdir(cwd)
 
 # the IP that can connect to the specified destination, 8.8.8.8 is the default
 def get_ip_address(dest: str ="8.8.8.8") -> str:
@@ -37,7 +25,6 @@ def get_ip_address(dest: str ="8.8.8.8") -> str:
     s.connect((dest, 80))
     return s.getsockname()[0]
 
-
 # ping command, returns True/False
 def ping(host: str) -> bool:
     """
@@ -49,7 +36,6 @@ def ping(host: str) -> bool:
     command = f"ping {param} 1 {host}"
     response = os.popen(command).read().lower()
     return 'unreachable' not in response and "100%" not in response
-
 
 # Context Managers Class For All The Functions That Need To Be Closed.
 class CM(object):
@@ -77,7 +63,7 @@ class CM(object):
 
     # Syslog server Context Manager
     class syslog(object):
-        def __init__(self, name: str, ip: str = get_ip_address()):
+        def __init__(self, name: str = "syslog", ip: str = get_ip_address()):
             self.syslog = Syslog(name=name,ip=ip)
 
         def __enter__(self):
@@ -85,6 +71,17 @@ class CM(object):
 
         def __exit__(self, type, value, traceback):
             self.syslog.close()
+
+    # context managers for changing directory
+    class cd(object):
+        def __init__(self, path: str):
+            os.chdir(path)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, type, value, traceback):
+            os.chdir(cwd)
 
 # class that contain all the automation functions with Chrome.
 class Chrome(object):
@@ -283,15 +280,10 @@ class Syslog(object):
         def handle(self):
             # socket = self.request[1]
             self.data = str(bytes.decode(self.request[0].strip()))
-            # self.match()
             # print(getframeinfo(currentframe()).lineno,"%s : " % self.client_address[0], self.data)
             logging.info(self.data)
 
-        def match(self):
-            if self.data:
-                pass
-
-    def __init__(self, name: str, ip: str = get_ip_address()):
+    def __init__(self, name: str = "syslog", ip: str = get_ip_address()):
         self.name,self.ip = name,ip
         t1 = threading.Thread(target=self.Server)
         t1.start()
