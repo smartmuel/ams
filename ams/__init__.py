@@ -381,8 +381,13 @@ class API(object):
     def get(self, url: str):
         response = requests.get(url, verify=False, data=None, cookies=self.cookie)
         return response.json()
+    
+    def post(self, url: str, json: dict):
+        response = requests.post(url, verify=False, data=None, json=json, cookies=self.cookie)
+        return response.json()
 
     def close(self):
             url = f"https://{self.vision}/mgmt/system/user/logout"
             response = requests.post(url, verify=False, cookies=self.cookie)
             # self.flag = response.status_code
+            
