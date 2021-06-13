@@ -83,6 +83,17 @@ class CM(object):
 
         def __exit__(self, type, value, traceback):
             os.chdir(cwd)
+        
+    # context managers for Vision API
+    class api(object):
+        def __init__(self, vision: str, user: str, password: str):
+            self.api = API(vision=vision, user=user, password=password)
+
+        def __enter__(self):
+            return self.api
+
+        def __exit__(self, type, value, traceback):
+            self.api.close()
 
 # class that contain all the automation functions with Chrome.
 class Chrome(object):
@@ -318,8 +329,12 @@ class BP(object):
     test_id = ""
 
     @staticmethod
-    def start(test: str, ip: str, user: str, password: str):
+    def start(test: str, ip: str, user: str, password: str, slot : int = 0, ports : list = []):
         bps = BPS(ip, user, password)
+        if slot:
+            bps.reservePorts(slot=slot,
+                             portList=ports,
+                             group=1, force=True)
         # login
         bps.login()
         # showing current port reservation state
@@ -367,7 +382,7 @@ class API(object):
         response = requests.get(url, verify=False, data=None, cookies=self.cookie)
         return response.json()
 
-    def logout(self):
+    def close(self):
             url = f"https://{self.vision}/mgmt/system/user/logout"
             response = requests.post(url, verify=False, cookies=self.cookie)
             # self.flag = response.status_code
