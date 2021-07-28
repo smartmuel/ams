@@ -1,4 +1,3 @@
-
 import os, socketserver, threading, logging, requests, paramiko
 from time import sleep, perf_counter
 from inspect import currentframe, getframeinfo
@@ -12,10 +11,11 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.keys import Keys
 from bps_restpy.bps_restpy_v1.bpsRest import BPS
 
-cwd = os.getcwd()
+
+
 
 # the IP that can connect to the specified destination, 8.8.8.8 is the default
-def get_ip_address(dest: str ="8.8.8.8") -> str:
+def get_ip_address(dest: str = "8.8.8.8") -> str:
     """
     :param dest: The destination ip to reach from the machine
     :return: The ip address that can connect to the specified destination
@@ -74,7 +74,8 @@ class CM(object):
 
     # Telnet Context Manager
     class telnet(object):
-        def __init__(self, host: str, user: str, password: str, pingf: bool = True, ask_user: str = b"User:", ask_pass: str = b"Password:", cli_sign: str = b"#"):
+        def __init__(self, host: str, user: str, password: str, pingf: bool = True, ask_user: str = b"User:",
+                     ask_pass: str = b"Password:", cli_sign: str = b"#"):
             """
 
             :param host: host to telnet
@@ -85,7 +86,8 @@ class CM(object):
             :param ask_pass: Read until a given byte string of the password statement
             :param cli_sign: Read until a given byte string of the cli sign
             """
-            self.telnet = Telnet(host=host, user=user, password=password, pingf=pingf, ask_user=ask_user, ask_pass=ask_pass, cli_sign=cli_sign)
+            self.telnet = Telnet(host=host, user=user, password=password, pingf=pingf, ask_user=ask_user,
+                                 ask_pass=ask_pass, cli_sign=cli_sign)
 
         def __enter__(self):
             return self.telnet
@@ -101,7 +103,7 @@ class CM(object):
             :param name: Syslog log file name
             :param ip: The IP address to listen to, the default ip would be the ip that can connect to 8.8.8.8
             """
-            self.syslog = Syslog(name=name,ip=ip)
+            self.syslog = Syslog(name=name, ip=ip)
 
         def __enter__(self):
             return self.syslog
@@ -128,7 +130,7 @@ class CM(object):
 
     # context manager for Breaking Point
     class bp(object):
-        def __init__(self, test: str, ip: str, user: str, password: str, slot : int = 0, ports : list = []):
+        def __init__(self, test: str, ip: str, user: str, password: str, slot: int = 0, ports: list = []):
             """
 
             :param test: Test name
@@ -139,51 +141,54 @@ class CM(object):
             :param ports: Ports to reserve as list, example: [1,2]
             :return: None
             """
-            BP.start(test=test,ip=ip,user=user,password=password,slot=slot,ports=ports)
+            BP.start(test=test, ip=ip, user=user, password=password, slot=slot, ports=ports)
             self.ip, self.user, self.password = ip, user, password
-            
+
         def __enter__(self):
             return self
-        
+
         def __exit__(self, type, value, traceback):
-            BP.stop(ip=self.ip,user=self.user,password=self.password)
+            BP.stop(ip=self.ip, user=self.user, password=self.password)
 
-    # class for context manager tools like: cd( change directory ), timer , etc..
-    class tools(object):
-        # context manager for changing directory
-        class cd(object):
-            def __init__(self, path: str):
-                """
+# class for context manager tools like: cd( change directory ), timer , etc..
+class Tools(object):
+    # current working directory
+    cwd = os.getcwd()
+    # context manager for changing directory
+    class cd(object):
+        def __init__(self, path: str):
+            """
 
-                :param path: The path of the directory to change to.
-                """
-                os.chdir(path)
+            :param path: The path of the directory to change to.
+            """
+            os.chdir(path)
 
-            def __enter__(self):
-                return self
+        def __enter__(self):
+            return self
 
-            def __exit__(self, type, value, traceback):
-                os.chdir(cwd)
+        def __exit__(self, type, value, traceback):
+            os.chdir(Tools.cwd)
 
-        # context managers timer
-        class timer(object):
-            def __init__(self, TIME: int, delay: int = 0):
-                """
+    # context managers timer
+    class timer(object):
+        def __init__(self, TIME: int, delay: int = 0):
+            """
 
-                :param TIME: The time range the timer should at least end, if the code within take more time then it would end after the code ended.
-                :param delay: Delay before the code running within
-                """
-                self.TIME = TIME
-                self.start = perf_counter()
-                sleep(delay)
+            :param TIME: The time range the timer should at least end, if the code within take more time then it would end after the code ended.
+            :param delay: Delay before the code running within
+            """
+            self.TIME = TIME
+            self.start = perf_counter()
+            sleep(delay)
 
-            def __enter__(self):
-                return self
+        def __enter__(self):
+            return self
 
-            def __exit__(self, type, value, traceback):
-                try:
-                    sleep(self.TIME - int(perf_counter() - self.start))
-                except:pass#silenced
+        def __exit__(self, type, value, traceback):
+            try:
+                sleep(self.TIME - int(perf_counter() - self.start))
+            except:
+                pass  # silenced
 
 # class that contain all the automation functions with Chrome.
 class Chrome(object):
@@ -199,7 +204,7 @@ class Chrome(object):
         # Opening Chrome Driver
         options = Options()
         options.add_experimental_option("prefs", {
-            "download.default_directory": rf"{cwd}",
+            "download.default_directory": rf"{Tools.cwd}",
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
             "safebrowsing.enabled": True
@@ -238,7 +243,7 @@ class Chrome(object):
 
     def wait(self, elem: str, delay: int = 10, Type: str = By.XPATH) -> bool:
         """
-        
+
         :param elem: The copied element, the element should be in the type that is selected
         :param delay: The delay
         :param Type: The default type is Xpath
@@ -355,7 +360,8 @@ class SSH(object):
                     if self.pingf:
                         print(getframeinfo(currentframe()).lineno, "invalid host or no ping to host")
                         self.close()
-                except:pass#Silenced
+                except:
+                    pass  # Silenced
         except:
             print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
             print(getframeinfo(currentframe()).lineno, "ssh_connect failed")
@@ -380,7 +386,8 @@ class SSH(object):
     def close(self):
         try:
             self.ssh.close()
-        except:pass#silenced
+        except:
+            pass  # silenced
         del self
 
 # class for Telnet
@@ -389,7 +396,8 @@ class Telnet(object):
     Class for Telnet
     """
 
-    def __init__(self, host: str, user: str, password: str, pingf: bool = True, ask_user: str = b"User:", ask_pass: str = b"Password:", cli_sign: str = b"#"):
+    def __init__(self, host: str, user: str, password: str, pingf: bool = True, ask_user: str = b"User:",
+                 ask_pass: str = b"Password:", cli_sign: str = b"#"):
         """
 
         :param host: host to telnet
@@ -436,7 +444,8 @@ class Telnet(object):
     def close(self):
         try:
             self.tn.close()
-        except:pass#silenced
+        except:
+            pass  # silenced
         del self
 
 # class for Syslog Server
@@ -458,14 +467,15 @@ class Syslog(object):
         :param name: Syslog log file name
         :param ip: The IP address to listen to, the default ip would be the ip that can connect to 8.8.8.8
         """
-        self.name,self.ip = name,ip
+        self.name, self.ip = name, ip
         t1 = threading.Thread(target=self.Server)
         t1.start()
 
     # Setting the Syslog server
     def Server(self):
         try:
-            logging.basicConfig(level=logging.INFO, format='%(message)s', datefmt='', filename=self.name,
+            logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d %(levelname)s:\t%(message)s',
+                                datefmt='%Y-%m-%d %H:%M:%S', filename=self.name,
                                 filemode='a')
             self.server = socketserver.UDPServer((self.ip, 514), Syslog.SyslogUDPHandler)
             self.server.serve_forever(poll_interval=0.5)
@@ -491,7 +501,7 @@ class BP(object):
     test_id = ""
 
     @staticmethod
-    def start(test: str, ip: str, user: str, password: str, slot : int = 0, ports : list = []):
+    def start(test: str, ip: str, user: str, password: str, slot: int = 0, ports: list = []):
         """
 
         :param test: Test name
@@ -565,20 +575,23 @@ class API(object):
         self.flag = False if "jsessionid" not in response.text else True
 
     def get(self, url: str):
+        if "://" not in url:
+            url = f"https://{self.vision}/mgmt/device/df{url}"
         response = requests.get(url, verify=False, data=None, cookies=self.cookie)
         return response.json()
-    
+
     def post(self, url: str, json: dict):
+        if "://" not in url:
+            url = f"https://{self.vision}/mgmt/device/df{url}"
         response = requests.post(url, verify=False, data=None, json=json, cookies=self.cookie)
         return response.json()
 
     def close(self):
-            url = f"https://{self.vision}/mgmt/system/user/logout"
-            response = requests.post(url, verify=False, cookies=self.cookie)
-            # self.flag = response.status_code
-            
+        url = f"https://{self.vision}/mgmt/system/user/logout"
+        response = requests.post(url, verify=False, cookies=self.cookie)
+        # self.flag = response.status_code
+
 """class Script(object):
-    
+
     @staticmethod
     def DP_upgrade():"""
-            
