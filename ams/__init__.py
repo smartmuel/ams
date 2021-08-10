@@ -56,7 +56,7 @@ class CM(object):
 
     # SSH Context Manager
     class ssh(object):
-        def __init__(self, host: str, user: str, password: str, pingf: bool = True):
+        def __init__(self, host: str, user: str, password: str, shell: bool = False, shell_key: str ='dfcshell\n', pingf: bool = True):
             """
 
             :param host: host to ssh
@@ -64,7 +64,7 @@ class CM(object):
             :param password: password for the ssh
             :param pingf: flag to ping
             """
-            self.ssh = SSH(host=host, user=user, password=password, pingf=pingf)
+            self.ssh = SSH(host=host, user=user, password=password, shell=shell, shell_key=shell_key, pingf=pingf)
 
         def __enter__(self):
             return self.ssh
@@ -323,7 +323,7 @@ class SSH(object):
     Class for SSH
     """
 
-    def __init__(self, host: str, user: str, password: str, pingf: bool = True):
+    def __init__(self, host: str, user: str, password: str, shell: bool = False, shell_key: str ='dfcshell\n', pingf: bool = True):
         """
 
         :param host: host to ssh
@@ -333,7 +333,7 @@ class SSH(object):
         """
         flag = ping(host) if pingf else True
         if flag:
-            self.host, self.user, self.password, self.pingf = host, user, password, pingf
+            self.host, self.user, self.password, self.pingf, self.shell, self.shell_key = host, user, password, pingf, shell, shell_key
             self.ssh_connect(host, user, password)
         else:
             print(getframeinfo(currentframe()).lineno, "invalid host or no ping to host")
@@ -366,20 +366,35 @@ class SSH(object):
             print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
             print(getframeinfo(currentframe()).lineno, "ssh_connect failed")
             self.close()
+        if self.shell:
+            self.channel = self.ssh.invoke_shell()
+            self.channel.send(self.shell_key)
 
-    def command(self, command: str, tries: int = 3):
+    def command(self, command: str, command_sleep: int = 2, recv_buffer: int = 99999999, tries: int = 3):
         """
         :param command: the command
         :param tries: the number of times to try to send the command
         :return: returns the output of the command - not working all the time
         """
-
         for i in range(tries):
-            try:
-                stdin, stdout, stderr = self.ssh.exec_command(command)
-                return stdout.readlines()
-            except:
-                self.ssh_connect(self.host, self.user, self.password)
+            if self.shell:
+                try:
+                    if self.channel.recv_ready():
+                        output = self.channel.recv(recv_buffer).decode("utf-8")
+                    self.channel.send(f'{command}\n')
+                    sleep(command_sleep)
+                    # Clearing output.
+                    if self.channel.recv_ready():
+                        output = self.channel.recv(recv_buffer).decode("utf-8")
+                    return output
+                except:
+                    self.ssh_connect(self.host, self.user, self.password)
+            else:
+                try:
+                    stdin, stdout, stderr = self.ssh.exec_command(command)
+                    return stdout.readlines()
+                except:
+                    self.ssh_connect(self.host, self.user, self.password)
         else:
             print(getframeinfo(currentframe()).lineno, "ssh_command failed")
 
