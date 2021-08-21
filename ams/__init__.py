@@ -1,4 +1,5 @@
-import os, socketserver, threading, logging, requests, paramiko
+import os, socketserver, threading, logging, requests, paramiko, math
+from dataclasses import dataclass
 from time import sleep, perf_counter
 from inspect import currentframe, getframeinfo
 from sys import exc_info
@@ -10,32 +11,73 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.keys import Keys
 from bps_restpy.bps_restpy_v1.bpsRest import BPS
+from typing import Any
 
 
+# class for context manager tools like: cd( change directory ), ping, etc..
+class Tools(object):
+    # current working directory
+    cwd = os.getcwd()
 
+    # exception flag
+    exc = True
 
-# the IP that can connect to the specified destination, 8.8.8.8 is the default
-def get_ip_address(dest: str = "8.8.8.8") -> str:
-    """
-    :param dest: The destination ip to reach from the machine
-    :return: The ip address that can connect to the specified destination
-    """
-    import socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect((dest, 80))
-    return s.getsockname()[0]
+    # context manager for changing directory
+    class cd(object):
+        def __init__(self, path: str):
+            """
 
-# ping command, returns True/False
-def ping(host: str) -> bool:
-    """
-    :param host: can be ip or host name
-    :return: True/False
-    """
-    from platform import system
-    param = '-n' if system().lower() == 'windows' else '-c'
-    command = f"ping {param} 1 {host}"
-    response = os.popen(command).read().lower()
-    return 'unreachable' not in response and "100%" not in response
+            :param path: The path of the directory to change to.
+            """
+            os.chdir(path)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, value, traceback):
+            os.chdir(Tools.cwd)
+
+    # the IP that can connect to the specified destination, 8.8.8.8 is the default
+    @staticmethod
+    def get_ip_address(dest: str = "8.8.8.8") -> str:
+        """
+        :param dest: The destination ip to reach from the machine
+        :return: The ip address that can connect to the specified destination
+        """
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect((dest, 80))
+        return s.getsockname()[0]
+
+    # ping command, returns True/False
+    @staticmethod
+    def ping(host: str, timeout: int = 1, tries: int = 2) -> bool:
+        """
+        :param host: can be ip or host name
+        :param timeout: timeout in seconds, 1 is the minimum
+        :param tries: number of ping re-tries
+        :return: True/False
+        """
+        from platform import system
+        flag = False
+        try:
+            assert timeout >= 1 and tries >= 1
+
+        except:
+            timeout, tries = 1, 2
+            print(getframeinfo(currentframe()).lineno,
+                  "timeout and tries should be more or equal to 1, revert to defaults timeout, tries = 1, 2")
+
+        command = f'ping -n 1 -w {timeout * 1000} {host}' if system().lower() == 'windows' else f'ping -c 1 -W {timeout} {host}'
+        for i in range(tries):
+            response = os.popen(command).read().lower()
+            if 'unreachable' not in response and "100%" not in response:
+                flag = True
+                break
+        if Tools.exc and (not flag):
+            raise Exc.NoPingError
+        return flag
+
 
 # Context Managers Class For All The Functions That Need To Be Closed.
 class CM(object):
@@ -51,12 +93,14 @@ class CM(object):
         def __enter__(self):
             return self.driver
 
-        def __exit__(self, type, value, traceback):
+        def __exit__(self, exc_type, value, traceback):
             self.driver.close()
+            del self.driver
 
     # SSH Context Manager
     class ssh(object):
-        def __init__(self, host: str, user: str, password: str, shell: bool = False, shell_key: str ='dfcshell\n', pingf: bool = True):
+        def __init__(self, host: str, user: str, password: str, shell: bool = False, shell_key: str = 'dfcshell\n',
+                     port: int = 22, pingf: bool = True):
             """
 
             :param host: host to ssh
@@ -64,18 +108,22 @@ class CM(object):
             :param password: password for the ssh
             :param pingf: flag to ping
             """
-            self.ssh = SSH(host=host, user=user, password=password, shell=shell, shell_key=shell_key, pingf=pingf)
+            self.host, self.user, self.password, self.shell, self.shell_key, self.port, self.pingf = host, user, password, shell, shell_key, port, pingf
 
         def __enter__(self):
+            self.ssh = SSH(host=self.host, user=self.user, password=self.password, shell=self.shell,
+                           shell_key=self.shell_key, port=self.port,
+                           pingf=self.pingf)
             return self.ssh
 
-        def __exit__(self, type, value, traceback):
+        def __exit__(self, exc_type, value, traceback):
             self.ssh.close()
+            del self.ssh
 
     # Telnet Context Manager
     class telnet(object):
-        def __init__(self, host: str, user: str, password: str, pingf: bool = True, ask_user: str = b"User:",
-                     ask_pass: str = b"Password:", cli_sign: str = b"#"):
+        def __init__(self, host: str, user: str, password: str, ask_user: str = b"User:",
+                     ask_pass: str = b"Password:", cli_sign: str = b"#", pingf: bool = True):
             """
 
             :param host: host to telnet
@@ -86,18 +134,19 @@ class CM(object):
             :param ask_pass: Read until a given byte string of the password statement
             :param cli_sign: Read until a given byte string of the cli sign
             """
-            self.telnet = Telnet(host=host, user=user, password=password, pingf=pingf, ask_user=ask_user,
-                                 ask_pass=ask_pass, cli_sign=cli_sign)
+            self.telnet = Telnet(host=host, user=user, password=password, ask_user=ask_user,
+                                 ask_pass=ask_pass, cli_sign=cli_sign, pingf=pingf)
 
         def __enter__(self):
             return self.telnet
 
-        def __exit__(self, type, value, traceback):
+        def __exit__(self, exc_type, value, traceback):
             self.telnet.close()
+            del self.telnet
 
     # Syslog server Context Manager
     class syslog(object):
-        def __init__(self, name: str = "syslog", ip: str = get_ip_address()):
+        def __init__(self, name: str = "syslog", ip: str = Tools.get_ip_address()):
             """
 
             :param name: Syslog log file name
@@ -108,8 +157,9 @@ class CM(object):
         def __enter__(self):
             return self.syslog
 
-        def __exit__(self, type, value, traceback):
+        def __exit__(self, exc_type, value, traceback):
             self.syslog.close()
+            del self.syslog
 
     # context manager for Vision API
     class api(object):
@@ -125,8 +175,9 @@ class CM(object):
         def __enter__(self):
             return self.api
 
-        def __exit__(self, type, value, traceback):
+        def __exit__(self, exc_type, value, traceback):
             self.api.close()
+            del self.api
 
     # context manager for Breaking Point
     class bp(object):
@@ -147,48 +198,9 @@ class CM(object):
         def __enter__(self):
             return self
 
-        def __exit__(self, type, value, traceback):
+        def __exit__(self, exc_type, value, traceback):
             BP.stop(ip=self.ip, user=self.user, password=self.password)
 
-# class for context manager tools like: cd( change directory ), timer , etc..
-class Tools(object):
-    # current working directory
-    cwd = os.getcwd()
-    # context manager for changing directory
-    class cd(object):
-        def __init__(self, path: str):
-            """
-
-            :param path: The path of the directory to change to.
-            """
-            os.chdir(path)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, type, value, traceback):
-            os.chdir(Tools.cwd)
-
-    # context managers timer
-    class timer(object):
-        def __init__(self, TIME: int, delay: int = 0):
-            """
-
-            :param TIME: The time range the timer should at least end, if the code within take more time then it would end after the code ended.
-            :param delay: Delay before the code running within
-            """
-            self.TIME = TIME
-            self.start = perf_counter()
-            sleep(delay)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, type, value, traceback):
-            try:
-                sleep(self.TIME - int(perf_counter() - self.start))
-            except:
-                pass  # silenced
 
 # class that contain all the automation functions with Chrome.
 class Chrome(object):
@@ -225,8 +237,9 @@ class Chrome(object):
 
     def url(self, url: str):
         try:
-            if "://" not in url:
-                url = f"https://{url}{(not bool(url)) * 'www.google.com'}"
+            # if the url string don't have '://' in it the next line would add 'https://'
+            # and if the url string is empty the default page is google.com
+            url = f"{('://' not in url) * 'https://'}{url}{(not url) * 'www.google.com'}"
             self.driver.get(url)
             self.driver.fullscreen_window()
         except:
@@ -238,8 +251,6 @@ class Chrome(object):
             self.driver.quit()
         except:
             print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
-        finally:
-            del self
 
     def wait(self, elem: str, delay: int = 10, Type: str = By.XPATH) -> bool:
         """
@@ -317,84 +328,69 @@ class Chrome(object):
             flag = False
         return flag
 
-# class for SSH
-class SSH(object):
-    """
-    Class for SSH
-    """
 
-    def __init__(self, host: str, user: str, password: str, shell: bool = False, shell_key: str ='dfcshell\n', pingf: bool = True):
-        """
+# data class for SSH
+@dataclass
+class SSH:
+    """
+    :param host: host to ssh
+    :param user: username for the ssh
+    :param password: password for the ssh
+    :param shell: flag for using invoke shell
+    :param shell_key: the command to invoke a shell script
+    :param port: ssh port
+    :param pingf: flag to ping
+    """
+    host: str
+    user: str
+    password: str
+    shell: bool = False
+    shell_key: str = 'dfcshell\n'
+    port: int = 22
+    pingf: bool = True
 
-        :param host: host to ssh
-        :param user: username for the ssh
-        :param password: password for the ssh
-        :param pingf: flag to ping
-        """
-        flag = ping(host) if pingf else True
-        if flag:
-            self.host, self.user, self.password, self.pingf, self.shell, self.shell_key = host, user, password, pingf, shell, shell_key
-            self.ssh_connect(host, user, password)
+    def __post_init__(self):
+        if Tools.ping(self.host) if self.pingf else True:
+            self.ssh_connect()
         else:
             print(getframeinfo(currentframe()).lineno, "invalid host or no ping to host")
-            self.close()
 
-    def ssh_connect(self, host: str, user: str, password: str, port: int = 22, tries: int = 5):
-        """
-
-        :param host: host to ssh
-        :param user: username for the ssh
-        :param password: password for the ssh
-        :param port: port to connect for the ssh, 22 is default
-        :param tries: the number of times to try to connect
-        """
-
+    def ssh_connect(self):
+        self.ssh = paramiko.SSHClient()
+        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            self.ssh = paramiko.SSHClient()
-            self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            for i in range(tries):
-                try:
-                    self.ssh.connect(hostname=host, port=port, username=user, password=password)
-                    break
-                except TimeoutError:
-                    if self.pingf:
-                        print(getframeinfo(currentframe()).lineno, "invalid host or no ping to host")
-                        self.close()
-                except:
-                    pass  # Silenced
-        except:
+            self.ssh.connect(hostname=self.host, port=self.port, username=self.user, password=self.password)
+        except:  # known errors TimeoutError, paramiko.ssh_exception.NoValidConnectionsError
             print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
-            print(getframeinfo(currentframe()).lineno, "ssh_connect failed")
             self.close()
+            if Tools.exc:
+                raise Exc.SSHError
         if self.shell:
             self.channel = self.ssh.invoke_shell()
             self.channel.send(self.shell_key)
 
-    def command(self, command: str, command_sleep: int = 2, recv_buffer: int = 99999999, tries: int = 3):
+    def command(self, command: str, command_sleep: int = 2, recv_buffer: int = 99999999, tries: int = 3) -> list:
         """
         :param command: the command
         :param tries: the number of times to try to send the command
         :return: returns the output of the command - not working all the time
         """
         for i in range(tries):
-            if self.shell:
-                try:
-                    if self.channel.recv_ready():
-                        output = self.channel.recv(recv_buffer).decode("utf-8")
-                    self.channel.send(f'{command}\n')
-                    sleep(command_sleep)
+            try:
+                if self.shell:
                     # Clearing output.
                     if self.channel.recv_ready():
-                        output = self.channel.recv(recv_buffer).decode("utf-8")
-                    return output
-                except:
-                    self.ssh_connect(self.host, self.user, self.password)
-            else:
-                try:
+                        output = self.channel.recv(recv_buffer)
+                    self.channel.send(f'{command}\n')
+                    sleep(command_sleep)
+                    if self.channel.recv_ready():
+                        return self.channel.recv(recv_buffer).decode("utf-8").split("\n")
+                else:
                     stdin, stdout, stderr = self.ssh.exec_command(command)
                     return stdout.readlines()
-                except:
-                    self.ssh_connect(self.host, self.user, self.password)
+            except:
+                print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
+                self.ssh_connect()
         else:
             print(getframeinfo(currentframe()).lineno, "ssh_command failed")
 
@@ -403,45 +399,51 @@ class SSH(object):
             self.ssh.close()
         except:
             pass  # silenced
-        del self
 
-# class for Telnet
-class Telnet(object):
+
+# data class for Telnet
+@dataclass
+class Telnet:
     """
-    Class for Telnet
+    :param host: host to telnet
+    :param user: username for the telnet
+    :param password: password for the telnet
+    :param ask_user: Read until a given byte string of the username statement
+    :param ask_pass: Read until a given byte string of the password statement
+    :param cli_sign: Read until a given byte string of the cli sign
+    :param pingf: flag to ping
     """
+    host: str
+    user: str
+    password: str
+    ask_user: str = b"User:"
+    ask_pass: str = b"Password:"
+    cli_sign: str = b"#"
+    pingf: bool = True
 
-    def __init__(self, host: str, user: str, password: str, pingf: bool = True, ask_user: str = b"User:",
-                 ask_pass: str = b"Password:", cli_sign: str = b"#"):
-        """
-
-        :param host: host to telnet
-        :param user: username for the telnet
-        :param password: password for the telnet
-        :param pingf: flag to ping
-        :param ask_user: Read until a given byte string of the username statement
-        :param ask_pass: Read until a given byte string of the password statement
-        :param cli_sign: Read until a given byte string of the cli sign
-        """
-        flag = ping(host) if pingf else True
-        if flag:
-            try:
-                import telnetlib
-                self.tn = telnetlib.Telnet()
-                self.tn.open(host)
-                self.tn.read_until(ask_user)
-                self.tn.write(user.encode('ascii') + b"\n")
-                self.tn.read_until(ask_pass)
-                self.tn.write(password.encode('ascii') + b"\n")
-                self.tn.read_until(cli_sign, 60).decode('utf-8')
-            except:
-                print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
-                self.close()
+    def __post_init__(self):
+        if Tools.ping(self.host) if self.pingf else True:
+            self.tel_connect()
         else:
             print(getframeinfo(currentframe()).lineno, "invalid host or no ping to host")
-            self.close()
 
-    def command(self, command: str):
+    def tel_connect(self):
+        try:
+            import telnetlib
+            self.tn = telnetlib.Telnet()
+            self.tn.open(self.host)
+            self.tn.read_until(self.ask_user)
+            self.tn.write(self.user.encode('ascii') + b"\n")
+            self.tn.read_until(self.ask_pass)
+            self.tn.write(self.password.encode('ascii') + b"\n")
+            self.tn.read_until(self.cli_sign, 60).decode('utf-8')
+        except:
+            print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
+            self.close()
+            if Tools.exc:
+                raise Exc.TelnetError
+
+    def command(self, command: str) -> str:
         """
 
         :param command: the command
@@ -450,8 +452,7 @@ class Telnet(object):
 
         try:
             self.tn.write(command.encode('ascii') + b"\n")
-            output = self.tn.read_until(b"#", 30).decode('utf-8')
-            return output
+            return self.tn.read_until(b"#", 30).decode('utf-8')
         except:
             print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
             self.close()
@@ -461,7 +462,7 @@ class Telnet(object):
             self.tn.close()
         except:
             pass  # silenced
-        del self
+
 
 # class for Syslog Server
 class Syslog(object):
@@ -476,7 +477,7 @@ class Syslog(object):
             # print(getframeinfo(currentframe()).lineno,"%s : " % self.client_address[0], self.data)
             logging.info(self.data)
 
-    def __init__(self, name: str = "syslog", ip: str = get_ip_address()):
+    def __init__(self, name: str = "syslog", ip: str = Tools.get_ip_address()):
         """
 
         :param name: Syslog log file name
@@ -505,7 +506,7 @@ class Syslog(object):
             self.server.shutdown()
         except:
             print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
-        del self
+
 
 # class for Breaking Point
 class BP(object):
@@ -566,13 +567,12 @@ class BP(object):
             except:
                 pass  # Silenced
 
+
 # class for Vision API
 class API(object):
     """
     Login/Logout/Get from Vision with REST API
     """
-    # flag that indicate the success of the login to vision
-    flag = False
 
     def __init__(self, vision: str, user: str, password: str):
         """
@@ -585,17 +585,16 @@ class API(object):
         url = f"https://{self.vision}/mgmt/system/user/login"
         fill_json = {"username": user, "password": password}
         response = requests.post(url, verify=False, data=None, json=fill_json)
-        # self.flag = response.status_code
         self.cookie = response.cookies
         self.flag = False if "jsessionid" not in response.text else True
 
-    def get(self, url: str):
+    def get(self, url: str) -> dict:
         if "://" not in url:
             url = f"https://{self.vision}/mgmt/device/df{url}"
         response = requests.get(url, verify=False, data=None, cookies=self.cookie)
         return response.json()
 
-    def post(self, url: str, json: dict):
+    def post(self, url: str, json: dict) -> dict:
         if "://" not in url:
             url = f"https://{self.vision}/mgmt/device/df{url}"
         response = requests.post(url, verify=False, data=None, json=json, cookies=self.cookie)
@@ -603,8 +602,22 @@ class API(object):
 
     def close(self):
         url = f"https://{self.vision}/mgmt/system/user/logout"
-        response = requests.post(url, verify=False, cookies=self.cookie)
-        # self.flag = response.status_code
+        requests.post(url, verify=False, cookies=self.cookie)
+
+
+# exceptions
+class Exc:
+    class NoPingError(Exception):
+        pass
+
+
+    class SSHError(Exception):
+        pass
+
+
+    class TelnetError(Exception):
+        pass
+
 
 """class Script(object):
 
