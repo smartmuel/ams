@@ -379,6 +379,7 @@ class SSH:
             try:
                 if self.shell:
                     # Clearing output.
+                    sleep(command_sleep / 6)
                     if self.channel.recv_ready():
                         output = self.channel.recv(recv_buffer)
                     self.channel.send(f'{command}\n')
