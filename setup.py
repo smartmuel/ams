@@ -2,18 +2,17 @@ import setuptools
 import subprocess
 import sys
 
-def install(package):
+'''def install(package):
     subprocess.check_call([sys.executable, "-m", "pip", "install", package, "--trusted-host","pypi.org", "--trusted-host","files.pythonhosted.org"])
-
-with open("README.md", "r") as fh:
-    long_description = fh.read()
 
 Lib = ["Selenium", "requests", "paramiko", "chromedriver_autoinstaller", "bps_restpy"]
 for i in Lib:
     try:
         install(i)
     except:
-        print(f"Falled to Download {i}")
+        print(f"Falled to Download {i}")'''
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setuptools.setup(
     name="ams", # Replace with your own username
@@ -25,6 +24,14 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/pypa/sampleproject",
     packages=setuptools.find_packages(include='ams'),
+    install_requires=[
+            'Selenium',
+            'requests',
+            'paramiko',
+            'chromedriver_autoinstaller',
+            'bps_restpy',
+            'telnetlib'
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
