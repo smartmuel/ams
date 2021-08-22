@@ -29,8 +29,7 @@ setuptools.setup(
             'requests',
             'paramiko',
             'chromedriver_autoinstaller',
-            'bps_restpy',
-            'telnetlib'
+            'bps_restpy'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
