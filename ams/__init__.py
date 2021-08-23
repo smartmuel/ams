@@ -385,7 +385,7 @@ class SSH:
                     self.channel.send(f'{command}\n')
                     sleep(command_sleep)
                     if self.channel.recv_ready():
-                        return self.channel.recv(recv_buffer).decode("utf-8").split("\n")
+                        return self.channel.recv(recv_buffer).decode("utf-8").split("\n")[1:-1]
                 else:
                     stdin, stdout, stderr = self.ssh.exec_command(command)
                     return stdout.readlines()
