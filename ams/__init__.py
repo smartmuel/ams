@@ -437,7 +437,7 @@ class Telnet:
             self.tn.write(self.user.encode('ascii') + b"\n")
             self.tn.read_until(self.ask_pass)
             self.tn.write(self.password.encode('ascii') + b"\n")
-            self.tn.read_until(self.cli_sign, 60).decode('utf-8')
+            self.tn.read_until(self.cli_sign, 60)
         except:
             print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
             self.close()
@@ -453,7 +453,12 @@ class Telnet:
 
         try:
             self.tn.write(command.encode('ascii') + b"\n")
-            return self.tn.read_until(b"#", 30).decode('utf-8')
+            output = self.tn.read_until(b"#", 60)
+            return output.decode('utf-8', 'replace').replace("�","").split("\n")
+        except AttributeError:
+            self.tn.write(command)
+            output = self.tn.read_until(b"#", 60)
+            return output.decode('utf-8', 'replace').replace("�", "").split("\n")
         except:
             print(getframeinfo(currentframe()).lineno, "Unexpected error:", exc_info()[0], exc_info()[1])
             self.close()
