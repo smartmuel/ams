@@ -16,7 +16,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="ams", # Replace with your own username
-    version="0.0.0",
+    version="0.0.1",
     author="Example Author",
     author_email="author@example.com",
     description="A small example package",
