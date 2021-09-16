@@ -15,8 +15,6 @@ class TestSSH():
             raise
         except Exc.NoPingError:
             pass
-        except:
-            assert False
 
     def test_ssh_enabled_no_ping_cm(self):
         try:
@@ -25,8 +23,6 @@ class TestSSH():
             raise
         except Exc.NoPingError:
             pass
-        except:
-            assert False
 
     def test_ssh_enabled_ping(self):
         ssh = SSH(SSH_ENABLED[0],SSH_ENABLED[1],SSH_ENABLED[2])
@@ -43,8 +39,6 @@ class TestSSH():
             raise
         except Exc.SSHError:
             pass
-        except:
-            assert False
 
     def test_ssh_disabled_cm(self):
         try:
@@ -53,8 +47,6 @@ class TestSSH():
             raise
         except Exc.SSHError:
             pass
-        except:
-            assert False
 
     def test_ssh_wrong_login(self):
         try:
@@ -63,8 +55,6 @@ class TestSSH():
             raise
         except Exc.SSHError:
             pass
-        except:
-            assert False
 
     def test_ssh_wrong_login_cm(self):
         try:
@@ -73,8 +63,6 @@ class TestSSH():
             raise
         except Exc.SSHError:
             pass
-        except:
-            assert False
 
     def test_ssh_command(self):
         ssh = SSH(SSH_ENABLED[0], SSH_ENABLED[1], SSH_ENABLED[2])

@@ -606,6 +606,18 @@ class API(object):
         response = requests.post(url, verify=False, data=None, json=json, cookies=self.cookie)
         return response.json()
 
+    def put(self, url: str, json: dict) -> dict:
+        if "://" not in url:
+            url = f"https://{self.vision}/mgmt/device/df{url}"
+        response = requests.put(url, verify=False, data=None, json=json, cookies=self.cookie)
+        return response.json()
+
+    def delete(self, url: str) -> dict:
+        if "://" not in url:
+            url = f"https://{self.vision}/mgmt/device/df{url}"
+        response = requests.delete(url, verify=False, data=None, cookies=self.cookie)
+        return response.json()
+
     def close(self):
         url = f"https://{self.vision}/mgmt/system/user/logout"
         requests.post(url, verify=False, cookies=self.cookie)
